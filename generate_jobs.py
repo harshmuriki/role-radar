@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 from datetime import UTC, datetime
 from pathlib import Path
@@ -16,12 +17,14 @@ from typing import Any
 from ats_scrapers import get_scraper_for_url
 from ats_scrapers.models import Job
 from ats_scrapers.scrapers.workday import WorkdayScraper
+from supabase import Client, create_client
 
 ROOT = Path(__file__).parent
 DEFAULT_COMPANIES = ROOT / "data" / "companies.json"
 DEFAULT_FILTERS = ROOT / "data" / "filters.json"
 DEFAULT_OUTPUT = ROOT / "public" / "jobs.json"
 DEFAULT_PIPELINE = ROOT / "public" / "pipeline.json"
+DEFAULT_SUPABASE_URL = "https://xcijdgzgecnizcwskzcb.supabase.co"
 LOCALE_PATH = re.compile(r"^(https://[^/]+\.myworkdayjobs\.com)/(?:[a-z]{2}(?:-[A-Z]{2})?)/([^/?#]+)", re.I)
 WORKDAY_URL = re.compile(r"^https://[^.]+\.wd\d+\.myworkdayjobs\.com/", re.I)
 POSTED_DAYS = re.compile(r"posted\s+(\d+)\+?\s+days?\s+ago", re.I)
@@ -161,12 +164,63 @@ def serialise_job(job: Job, company_name: str) -> dict[str, Any]:
     }
 
 
+def publish_to_supabase(
+    jobs: list[dict[str, Any]], *, source_count: int, fetched_count: int
+) -> None:
+    """Publish one complete scan; only the latest run is visible to the dashboard."""
+    service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    if not service_key:
+        raise RuntimeError(
+            "SUPABASE_SERVICE_ROLE_KEY is required to publish jobs. "
+            "Add it to your local environment; never commit it or expose it to Vercel."
+        )
+    client: Client = create_client(os.getenv("SUPABASE_URL", DEFAULT_SUPABASE_URL), service_key)
+    run = (
+        client.table("role_radar_runs")
+        .insert(
+            {
+                "source_count": source_count,
+                "fetched_count": fetched_count,
+                "matched_count": len(jobs),
+            }
+        )
+        .execute()
+    )
+    run_id = run.data[0]["id"]
+    rows = [
+        {
+            "id": job["id"],
+            "last_seen_run_id": run_id,
+            "title": job["title"],
+            "company": job["company"],
+            "ats": job["ats"],
+            "location": job["location"],
+            "remote": job["remote"],
+            "employment_type": job["employmentType"],
+            "department": job["department"],
+            "posted_at": job["postedAt"],
+            "posted_text": job["postedText"],
+            "posted_days_ago": job["postedDaysAgo"],
+            "url": job["url"],
+            "requisition_id": job["requisitionId"],
+            "description": job["description"],
+            "updated_at": datetime.now(UTC).isoformat(),
+        }
+        for job in jobs
+    ]
+    if rows:
+        client.table("role_radar_jobs").upsert(rows, on_conflict="id").execute()
+    client.table("role_radar_jobs").delete().neq("last_seen_run_id", run_id).execute()
+    print(f"Published scan {run_id} to Supabase.")
+
+
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Generate static Role Radar job data with ats-scrapers.")
+    parser = argparse.ArgumentParser(description="Generate and publish Role Radar jobs with ats-scrapers.")
     parser.add_argument("--companies", type=Path, default=DEFAULT_COMPANIES)
     parser.add_argument("--filters", type=Path, default=DEFAULT_FILTERS)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--pipeline-output", type=Path, default=DEFAULT_PIPELINE)
+    parser.add_argument("--skip-upload", action="store_true", help="Create local JSON snapshots without publishing to Supabase.")
     args = parser.parse_args()
 
     companies_config = json.loads(args.companies.read_text(encoding="utf-8"))
@@ -199,6 +253,8 @@ def main() -> None:
     args.pipeline_output.parent.mkdir(parents=True, exist_ok=True)
     args.pipeline_output.write_text(json.dumps({"generatedAt": generated_at, "companies": companies}, indent=2), encoding="utf-8")
     print(f"Wrote {len(all_jobs)} matching jobs to {args.output}")
+    if not args.skip_upload:
+        publish_to_supabase(all_jobs, source_count=len(companies), fetched_count=fetched)
 
 
 if __name__ == "__main__":
