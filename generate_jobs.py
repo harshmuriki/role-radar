@@ -16,6 +16,7 @@ from typing import Any
 
 from ats_scrapers import get_scraper_for_url
 from ats_scrapers.models import Job
+from ats_scrapers.scrapers import get_scraper
 from ats_scrapers.scrapers.workday import WorkdayScraper
 from supabase import Client, create_client
 
@@ -44,6 +45,17 @@ class RoleRadarWorkdayScraper(WorkdayScraper):
         raw = dict(job.raw or {})
         raw["role_radar_posted_on"] = item.get("postedOn") or ""
         return job.model_copy(update={"raw": raw})
+
+
+def load_local_env() -> None:
+    """Load this project's ignored local .env file without another dependency."""
+    env_file = ROOT / ".env"
+    if not env_file.exists():
+        return
+    for line in env_file.read_text(encoding="utf-8").splitlines():
+        key, separator, value = line.partition("=")
+        if separator and key and not key.lstrip().startswith("#"):
+            os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
 
 def normalize_url(url: str) -> str:
@@ -122,23 +134,56 @@ def job_matches(job: Job, filters: dict[str, Any]) -> bool:
     return True
 
 
-def load_companies(path: Path) -> list[dict[str, str]]:
+def load_companies(path: Path) -> list[dict[str, Any]]:
     data = json.loads(path.read_text(encoding="utf-8"))
     rows = data if isinstance(data, list) else data.get("links", data.get("companies", []))
-    companies: list[dict[str, str]] = []
+    companies: list[dict[str, Any]] = []
     for row in rows:
         if isinstance(row, str):
-            companies.append({"name": "", "url": row})
+            companies.append({"name": "", "url": row, "posted_within_days": None})
         elif isinstance(row, dict) and row.get("url"):
-            companies.append({"name": str(row.get("name") or ""), "url": str(row["url"])})
+            companies.append({
+                "name": str(row.get("name") or ""),
+                "url": str(row["url"]),
+                "posted_within_days": row.get("posted_within_days"),
+                "ats_type": row.get("ats_type"),
+                "ats_slug": row.get("ats_slug"),
+            })
     if not companies:
         raise ValueError(f"No company links found in {path}")
     return companies
 
 
-def scraper_for(url: str, company_name: str, needs_description: bool):
+def load_supabase_companies() -> list[dict[str, Any]]:
+    """Read the editable company list from Supabase using the local secret key."""
+    secret_key = os.getenv("SUPABASE_SECRET_KEY")
+    if not secret_key:
+        return []
+    client: Client = create_client(os.getenv("SUPABASE_URL", DEFAULT_SUPABASE_URL), secret_key)
+    response = (
+        client.table("role_radar_companies")
+        .select("name, careers_url, ats_type, ats_slug, posted_within_days")
+        .eq("active", True)
+        .order("created_at")
+        .execute()
+    )
+    return [
+        {
+            "name": row["name"],
+            "url": row["careers_url"],
+            "ats_type": row.get("ats_type"),
+            "ats_slug": row.get("ats_slug"),
+            "posted_within_days": row.get("posted_within_days"),
+        }
+        for row in response.data
+    ]
+
+
+def scraper_for(url: str, company_name: str, needs_description: bool, ats_type: str | None = None, ats_slug: str | None = None):
     normalized = normalize_url(url)
     options = {"company_name": company_name or None, "include_descriptions": needs_description}
+    if ats_type and ats_slug:
+        return get_scraper(ats_type, ats_slug, **options)
     if WORKDAY_URL.match(normalized):
         return RoleRadarWorkdayScraper.from_url(normalized, **options)
     return get_scraper_for_url(normalized, **options)
@@ -215,6 +260,7 @@ def publish_to_supabase(
 
 
 def main() -> None:
+    load_local_env()
     parser = argparse.ArgumentParser(description="Generate and publish Role Radar jobs with ats-scrapers.")
     parser.add_argument("--companies", type=Path, default=DEFAULT_COMPANIES)
     parser.add_argument("--filters", type=Path, default=DEFAULT_FILTERS)
@@ -224,7 +270,7 @@ def main() -> None:
     args = parser.parse_args()
 
     companies_config = json.loads(args.companies.read_text(encoding="utf-8"))
-    companies = load_companies(args.companies)
+    companies = load_supabase_companies() or load_companies(args.companies)
     filters = json.loads(args.filters.read_text(encoding="utf-8"))
     if filters.get("posted_within_days") is None and isinstance(companies_config, dict):
         filters["posted_within_days"] = companies_config.get("posted_within_days", 7)
@@ -237,9 +283,18 @@ def main() -> None:
         name, url = company["name"].strip(), company["url"].strip()
         print(f"[{index}/{len(companies)}] {name or url}")
         try:
-            jobs = scraper_for(url, name, needs_description).fetch()
+            jobs = scraper_for(
+                url,
+                name,
+                needs_description,
+                company.get("ats_type"),
+                company.get("ats_slug"),
+            ).fetch()
             fetched += len(jobs)
-            matches = [serialise_job(job, name) for job in jobs if job_matches(job, filters)]
+            company_filters = dict(filters)
+            if company.get("posted_within_days") is not None:
+                company_filters["posted_within_days"] = company["posted_within_days"]
+            matches = [serialise_job(job, name) for job in jobs if job_matches(job, company_filters)]
             all_jobs.extend(matches)
             print(f"  {len(matches)} relevant / {len(jobs)} fetched")
         except Exception as exc:

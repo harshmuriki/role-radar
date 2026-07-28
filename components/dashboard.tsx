@@ -10,12 +10,12 @@ import {
   Radar,
   RefreshCw,
   Search,
-  Settings2,
   Sparkles,
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
+import { CompanyManager } from "@/components/company-manager";
 
 type Job = {
   id: string;
@@ -188,13 +188,7 @@ export function Dashboard() {
         </section>
 
         <section className="workspace">
-          <aside className="control-panel">
-            <div className="panel-heading"><div><p className="eyebrow">Pipeline</p><h2>How it stays fresh</h2></div><Settings2 size={20} /></div>
-            <div className="pipeline-step"><span>01</span><p>Update company links and your filters locally.</p></div>
-            <div className="pipeline-step"><span>02</span><p>Run the ATS scraper from your laptop.</p></div>
-            <div className="pipeline-step"><span>03</span><p>Supabase publishes the latest matching roles here.</p></div>
-            <div className="local-note"><Radar size={16} /><p>Only results from the latest scan are shown.</p></div>
-          </aside>
+          <CompanyManager />
 
           <section className="results-panel" aria-labelledby="roles-heading">
             <div className="results-heading">

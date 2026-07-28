@@ -43,6 +43,28 @@ h1, h2, h3, p { margin-top: 0; }
 .local-note { display: flex; gap: 9px; margin-top: 18px; padding: 12px; color: var(--teal-dark); border-radius: 10px; background: var(--mint); font-size: 11px; }
 .local-note svg { flex: none; margin-top: 1px; }
 .local-note p { margin: 0; }
+.company-list { max-height: 248px; margin: 0 -4px; overflow-y: auto; }
+.company-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 13px 4px; border-bottom: 1px solid var(--soft); }
+.company-row strong, .company-row span { display: block; }
+.company-row strong { color: var(--navy); font-size: 13px; }
+.company-row span { margin-top: 2px; color: var(--ink-muted); font-size: 10px; }
+.delete-company { display: grid; flex: none; width: 29px; height: 29px; place-items: center; color: #a26861; border: 0; border-radius: 7px; background: transparent; }
+.delete-company:hover { color: var(--danger); background: #fff3f1; }
+.add-company-toggle { display: flex; width: 100%; align-items: center; gap: 7px; margin-top: 16px; padding: 10px 0; color: var(--teal-dark); border: 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: transparent; font-size: 12px; font-weight: 700; text-align: left; }
+.add-company-toggle svg:last-child { margin-left: auto; }
+.company-form { display: grid; gap: 11px; padding: 15px 0 1px; }
+.company-form label { display: grid; gap: 5px; color: var(--navy); font-size: 11px; font-weight: 700; }
+.company-form label:has(input[type="number"]) { grid-template-columns: 1fr 42px; align-items: center; }
+.company-form label:has(input[type="number"]) input { grid-column: 1; }
+.company-form label:has(input[type="number"]) span { grid-column: 2; grid-row: 1 / span 2; margin-top: 17px; color: var(--ink-muted); font-size: 11px; }
+.company-form input { height: 37px; padding: 0 9px; border: 1px solid var(--line); border-radius: 7px; background: #fff; font-size: 12px; }
+.company-form input:focus { border-color: var(--teal); box-shadow: 0 0 0 3px rgba(13,125,120,.11); }
+.company-form details { color: var(--ink-muted); font-size: 11px; }
+.company-form summary { cursor: pointer; color: var(--teal-dark); font-weight: 700; }
+.company-form details p { margin: 7px 0 10px; line-height: 1.45; }
+.company-form details label + label { margin-top: 9px; }
+.company-form .primary-button { min-height: 38px; font-size: 12px; }
+.company-error { margin: 10px 0 0; color: var(--danger); font-size: 11px; line-height: 1.45; }
 .results-panel { min-height: 510px; overflow: hidden; }
 .results-heading { display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 20px 22px; border-bottom: 1px solid var(--line); }
 .results-heading h2 span { color: var(--ink-muted); font-size: 13px; font-weight: 500; }

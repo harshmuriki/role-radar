@@ -19,7 +19,13 @@ npm install
 npm run build
 ```
 
-Edit `data/companies.json` to add a company careers link. Edit `data/filters.json` to define what relevant means to you. The generator writes its local JSON snapshots and publishes the latest matching jobs to Supabase. The secret key is local-only and must never be committed.
+Edit `data/filters.json` to define what relevant means to you. The generator writes its local JSON snapshots and publishes the latest matching jobs to Supabase. The secret key is local-only and must never be committed.
+
+## Add company careers sites
+
+Sign into the dashboard, use **Add careers site**, and enter the company name plus its careers-page URL. The next local `generate_jobs.py` run reads that list from Supabase and uses `ats-scrapers` to detect and scrape supported ATS pages directly (including Workday, Greenhouse, Lever, Ashby, Workable, iCIMS, and more).
+
+For a custom-domain careers page that cannot be detected from its URL, expand **ATS override** and add the platform name and company slug. Unsupported sites are reported clearly in the local run output instead of being silently ignored.
 
 ## Private access
 
