@@ -263,6 +263,24 @@ def publish_to_supabase(
     print(f"Published scan {run_id} to Supabase.")
 
 
+def process_queued_tests() -> None:
+    secret_key = os.getenv("SUPABASE_SECRET_KEY")
+    if not secret_key:
+        return
+    client: Client = create_client(os.getenv("SUPABASE_URL", DEFAULT_SUPABASE_URL), secret_key)
+    tests = client.table("role_radar_company_tests").select("id, company_id, role_radar_companies(name, careers_url, ats_type, ats_slug)").eq("status", "queued").execute().data
+    for test in tests:
+        source = test["role_radar_companies"]
+        try:
+            jobs = scraper_for(source["careers_url"], source["name"], False, source.get("ats_type"), source.get("ats_slug")).fetch()
+            sample = [{"title": job.title, "location": job.location} for job in jobs[:5]]
+            client.table("role_radar_company_tests").update({"status": "passed", "fetched_count": len(jobs), "sample_jobs": sample, "tested_at": datetime.now(UTC).isoformat()}).eq("id", test["id"]).execute()
+            print(f"Test passed for {source['name']}: {len(jobs)} jobs")
+        except Exception as exc:
+            client.table("role_radar_company_tests").update({"status": "failed", "error": str(exc), "tested_at": datetime.now(UTC).isoformat()}).eq("id", test["id"]).execute()
+            print(f"Test failed for {source['name']}: {exc}")
+
+
 def main() -> None:
     load_local_env()
     parser = argparse.ArgumentParser(description="Generate and publish Role Radar jobs with ats-scrapers.")
@@ -277,6 +295,8 @@ def main() -> None:
     parser.add_argument("--test-slug", help="Optional company slug for --test-ats.")
     parser.add_argument("--test-limit", type=int, default=8, help="Maximum sample roles to show during a company test.")
     args = parser.parse_args()
+
+    process_queued_tests()
 
     if args.test_company:
         if bool(args.test_ats) != bool(args.test_slug):
