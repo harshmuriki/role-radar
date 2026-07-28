@@ -163,10 +163,12 @@ def load_supabase_companies() -> list[dict[str, Any]]:
     if not secret_key:
         return []
     client: Client = create_client(os.getenv("SUPABASE_URL", DEFAULT_SUPABASE_URL), secret_key)
+    user_id = worker_user_id(client)
     response = (
         client.table("role_radar_companies")
         .select("name, careers_url, ats_type, ats_slug, posted_within_days, role_filters")
         .eq("active", True)
+        .eq("user_id", user_id)
         .order("created_at")
         .execute()
     )
@@ -183,9 +185,21 @@ def load_supabase_companies() -> list[dict[str, Any]]:
     ]
 
 
+def worker_user_id(client: Client) -> str:
+    email = os.getenv("ROLE_RADAR_USER_EMAIL")
+    if not email:
+        raise RuntimeError("ROLE_RADAR_USER_EMAIL is required for a local worker.")
+    users = client.auth.admin.list_users()
+    users = users.users if hasattr(users, "users") else users
+    user = next((item for item in users if item.email and item.email.lower() == email.lower()), None)
+    if not user:
+        raise RuntimeError(f"No Supabase user found for {email}.")
+    return str(user.id)
+
+
 def scraper_for(url: str, company_name: str, needs_description: bool, ats_type: str | None = None, ats_slug: str | None = None):
     normalized = normalize_url(url)
-    options = {"company_name": company_name or None, "include_descriptions": needs_description}
+    options = {"include_descriptions": needs_description}
     if ats_type and ats_slug:
         return get_scraper(ats_type, ats_slug, **options)
     if WORKDAY_URL.match(normalized):
@@ -224,6 +238,7 @@ def publish_to_supabase(
             "Add it to your local environment; never commit it or expose it to Vercel."
         )
     client: Client = create_client(os.getenv("SUPABASE_URL", DEFAULT_SUPABASE_URL), secret_key)
+    user_id = worker_user_id(client)
     run = (
         client.table("role_radar_runs")
         .insert(
@@ -231,6 +246,7 @@ def publish_to_supabase(
                 "source_count": source_count,
                 "fetched_count": fetched_count,
                 "matched_count": len(jobs),
+                "user_id": user_id,
             }
         )
         .execute()
@@ -240,6 +256,7 @@ def publish_to_supabase(
         {
             "id": job["id"],
             "last_seen_run_id": run_id,
+            "user_id": user_id,
             "title": job["title"],
             "company": job["company"],
             "ats": job["ats"],
@@ -268,7 +285,8 @@ def process_queued_tests() -> None:
     if not secret_key:
         return
     client: Client = create_client(os.getenv("SUPABASE_URL", DEFAULT_SUPABASE_URL), secret_key)
-    tests = client.table("role_radar_company_tests").select("id, company_id, role_radar_companies(name, careers_url, ats_type, ats_slug)").eq("status", "queued").execute().data
+    user_id = worker_user_id(client)
+    tests = client.table("role_radar_company_tests").select("id, company_id, role_radar_companies(name, careers_url, ats_type, ats_slug)").eq("status", "queued").eq("user_id", user_id).execute().data
     for test in tests:
         source = test["role_radar_companies"]
         try:
