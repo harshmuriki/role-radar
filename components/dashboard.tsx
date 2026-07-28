@@ -1,0 +1,28 @@
+"use client";
+
+import { BriefcaseBusiness, CircleAlert, ExternalLink, LoaderCircle, Radar, Search, Settings2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "@/lib/supabase";
+
+type Job = { id: string; title: string; company: string; ats: string; location: string | null; remote: boolean | null; employmentType: string | null; department: string | null; postedAt: string | null; postedText: string | null; postedDaysAgo: number | null; url: string; requisitionId: string | null; description: string | null };
+type Run = { id: string; generated_at: string; source_count: number; fetched_count: number; matched_count: number };
+const initialRun: Run | null = null;
+
+export function Dashboard() {
+  const [run, setRun] = useState<Run | null>(initialRun);
+  const [jobsData, setJobsData] = useState<Job[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState("");
+  const [error, setError] = useState("");
+  useEffect(() => { (async () => { const { data: latest, error: runError } = await supabase.from("role_radar_runs").select("*").order("generated_at", { ascending: false }).limit(1).maybeSingle(); if (runError) throw runError; if (!latest) return; const { data: rows, error: jobsError } = await supabase.from("role_radar_jobs").select("*").eq("last_seen_run_id", latest.id).order("posted_days_ago", { ascending: true }).order("title"); if (jobsError) throw jobsError; setRun(latest); setJobsData((rows ?? []).map((job) => ({ id: job.id, title: job.title, company: job.company, ats: job.ats, location: job.location, remote: job.remote, employmentType: job.employment_type, department: job.department, postedAt: job.posted_at, postedText: job.posted_text, postedDaysAgo: job.posted_days_ago, url: job.url, requisitionId: job.requisition_id, description: job.description }))); })().catch(() => setError("No Supabase job data is available yet. Run the local generator to publish your first scan.")).finally(() => setLoading(false)); }, []);
+  const jobs = useMemo(() => { const needle = query.toLowerCase(); return !needle ? jobsData : jobsData.filter((job) => `${job.title} ${job.company} ${job.location} ${job.department}`.toLowerCase().includes(needle)); }, [jobsData, query]);
+  return <main>
+    <header className="topbar"><div className="brand"><span className="brand-mark"><Radar size={20} /></span><span>Role Radar</span></div><div className="topbar-note">Static job intelligence dashboard</div></header>
+    <section className="hero"><div><p className="eyebrow">Your focused job pipeline</p><h1>See the roles worth<br />your attention.</h1><p className="hero-copy">Your local ATS-Scrapers job runs publish directly to Supabase. This dashboard always reads the latest matching roles.</p></div><div className="scan-status"><span className={run ? "status-dot" : "status-dot idle"} /><span>{run ? `Updated ${new Date(run.generated_at).toLocaleString()}` : "Awaiting first scan"}</span></div></section>
+    {error && <p className="feedback error" role="alert">{error}</p>}
+    <section className="stats" aria-label="Pipeline summary"><Metric label="Companies" value={run?.source_count ?? 0} /><Metric label="Relevant roles" value={run?.matched_count ?? 0} /><Metric label="Listings scanned" value={run?.fetched_count ?? 0} /></section>
+    <section className="workspace static-workspace"><aside className="control-panel"><div className="panel-heading"><div><p className="eyebrow">Data source</p><h2>Supabase sync</h2></div><BriefcaseBusiness size={21} /></div><div className="local-note"><Settings2 size={17} /><p>Manage company links and filters locally, then run <code>generate_jobs.py</code> to publish a new scan.</p></div></aside><section className="results-panel"><div className="panel-heading results-heading"><div><p className="eyebrow">Matching positions</p><h2>Latest opportunities</h2></div><label className="search"><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search results" aria-label="Search results" /></label></div>{loading ? <div className="empty-state"><LoaderCircle className="spin" /><p>Loading current job data…</p></div> : jobs.length ? <div className="table-wrap"><table><thead><tr><th>Position</th><th>Company</th><th>Location</th><th>Created</th><th aria-label="Open job" /></tr></thead><tbody>{jobs.map((job) => <tr key={job.id}><td><a href={job.url} target="_blank" rel="noreferrer" className="job-title">{job.title}</a><span className="job-meta">{job.department || job.employmentType || job.ats}</span></td><td>{job.company}</td><td>{job.location || "—"}{job.remote && <span className="remote-tag">Remote</span>}</td><td><strong>{formatPosted(job)}</strong></td><td><a className="open-link" href={job.url} target="_blank" rel="noreferrer" aria-label={`Open ${job.title} at ${job.company}`}><ExternalLink size={17} /></a></td></tr>)}</tbody></table></div> : <div className="empty-state"><Radar size={31} /><h3>{query ? "No positions match that search" : "Your matches will appear here"}</h3><p>{query ? "Try a broader search." : "Run your local generator to publish the latest results."}</p></div>}</section></section>
+  </main>;
+}
+function formatPosted(job: Job) { if (job.postedDaysAgo === 0) return "Today"; if (job.postedDaysAgo === 1) return "Yesterday"; if (job.postedDaysAgo !== null) return `${job.postedDaysAgo}d ago`; if (job.postedAt) return new Date(job.postedAt).toLocaleDateString(); return job.postedText || "Unknown"; }
+function Metric({ label, value }: { label: string; value: number }) { return <div className="metric"><span>{label}</span><strong>{value}</strong></div>; }

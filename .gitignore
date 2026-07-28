@@ -1,0 +1,17 @@
+# Next.js
+.next/
+node_modules/
+out/
+.venv/
+
+# Local environment and Vercel credentials
+.env*
+!.env.example
+.vercel/
+
+# Generated crawler exports
+output/*.csv
+
+# Python cache
+__pycache__/
+*.py[cod]
