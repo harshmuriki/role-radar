@@ -271,7 +271,26 @@ def main() -> None:
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--pipeline-output", type=Path, default=DEFAULT_PIPELINE)
     parser.add_argument("--skip-upload", action="store_true", help="Create local JSON snapshots without publishing to Supabase.")
+    parser.add_argument("--test-company", help="Fetch one careers URL and print a sample without writing or publishing anything.")
+    parser.add_argument("--test-name", default="Test company", help="Display name used with --test-company.")
+    parser.add_argument("--test-ats", help="Optional ats-scrapers platform override for --test-company.")
+    parser.add_argument("--test-slug", help="Optional company slug for --test-ats.")
+    parser.add_argument("--test-limit", type=int, default=8, help="Maximum sample roles to show during a company test.")
     args = parser.parse_args()
+
+    if args.test_company:
+        if bool(args.test_ats) != bool(args.test_slug):
+            parser.error("--test-ats and --test-slug must be provided together.")
+        print(f"Testing {args.test_name}: {args.test_company}")
+        try:
+            jobs = scraper_for(args.test_company, args.test_name, False, args.test_ats, args.test_slug).fetch()
+        except Exception as exc:
+            print(f"TEST FAILED: {exc}")
+            raise SystemExit(1) from exc
+        print(f"TEST PASSED: detected {jobs[0].ats_type if jobs else 'ATS'} and fetched {len(jobs)} jobs.")
+        for job in jobs[:max(0, args.test_limit)]:
+            print(f"- {job.title or 'Untitled'} | {job.location or 'Location not listed'}")
+        return
 
     companies_config = json.loads(args.companies.read_text(encoding="utf-8"))
     companies = load_supabase_companies() or load_companies(args.companies)

@@ -27,6 +27,14 @@ Sign into the dashboard, use **Add careers site**, and enter the company name pl
 
 For a custom-domain careers page that cannot be detected from its URL, expand **ATS override** and add the platform name and company slug. Unsupported sites are reported clearly in the local run output instead of being silently ignored.
 
+Before adding a source, validate it without changing data or publishing jobs:
+
+```bash
+python generate_jobs.py --test-company "https://boards.greenhouse.io/company" --test-name "Company"
+```
+
+The command prints the detected ATS, the fetched job count, and a small role sample. For a custom-domain override, add `--test-ats greenhouse --test-slug company`.
+
 ## Private access
 
 The dashboard uses Supabase Auth. Sign up on the site, then grant that account access from your laptop:
