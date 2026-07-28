@@ -123,6 +123,9 @@ def job_matches(job: Job, filters: dict[str, Any]) -> bool:
         return False
     if not contains_all(description, as_list(filters.get("description_all"))):
         return False
+    excluded = as_list(filters.get("exclude_any"))
+    if excluded and contains_any(f"{title} {department} {description}", excluded):
+        return False
     if filters.get("remote") is True and job.is_remote is not True:
         return False
     if filters.get("remote") is False and job.is_remote is True:
@@ -162,7 +165,7 @@ def load_supabase_companies() -> list[dict[str, Any]]:
     client: Client = create_client(os.getenv("SUPABASE_URL", DEFAULT_SUPABASE_URL), secret_key)
     response = (
         client.table("role_radar_companies")
-        .select("name, careers_url, ats_type, ats_slug, posted_within_days")
+        .select("name, careers_url, ats_type, ats_slug, posted_within_days, role_filters")
         .eq("active", True)
         .order("created_at")
         .execute()
@@ -174,6 +177,7 @@ def load_supabase_companies() -> list[dict[str, Any]]:
             "ats_type": row.get("ats_type"),
             "ats_slug": row.get("ats_slug"),
             "posted_within_days": row.get("posted_within_days"),
+            "role_filters": row.get("role_filters") or {},
         }
         for row in response.data
     ]
@@ -294,6 +298,9 @@ def main() -> None:
             company_filters = dict(filters)
             if company.get("posted_within_days") is not None:
                 company_filters["posted_within_days"] = company["posted_within_days"]
+            for key, value in (company.get("role_filters") or {}).items():
+                if value not in (None, [], ""):
+                    company_filters[key] = value
             matches = [serialise_job(job, name) for job in jobs if job_matches(job, company_filters)]
             all_jobs.extend(matches)
             print(f"  {len(matches)} relevant / {len(jobs)} fetched")

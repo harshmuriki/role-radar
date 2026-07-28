@@ -1,12 +1,13 @@
 {
-  "generatedAt": "2026-07-28T14:21:23.976420+00:00",
+  "generatedAt": "2026-07-28T14:23:47.647020+00:00",
   "companies": [
     {
       "name": "Owens & Minor",
       "url": "https://owensminor.wd1.myworkdayjobs.com/en-US/OMCareers",
       "ats_type": null,
       "ats_slug": null,
-      "posted_within_days": 7
+      "posted_within_days": 7,
+      "role_filters": {}
     }
   ]
 }
