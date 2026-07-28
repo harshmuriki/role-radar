@@ -13,13 +13,24 @@ Role Radar is a static Vercel dashboard for jobs generated locally with `ats-scr
 ```bash
 conda activate role-radar
 pip install -r requirements.txt
-export SUPABASE_SERVICE_ROLE_KEY="your-service-role-key"
+export SUPABASE_SECRET_KEY="your-sb-secret-key"
 python generate_jobs.py
 npm install
 npm run build
 ```
 
-Edit `data/companies.json` to add a company careers link. Edit `data/filters.json` to define what relevant means to you. The generator writes its local JSON snapshots and publishes the latest matching jobs to Supabase. The service-role key is local-only and must never be committed.
+Edit `data/companies.json` to add a company careers link. Edit `data/filters.json` to define what relevant means to you. The generator writes its local JSON snapshots and publishes the latest matching jobs to Supabase. The secret key is local-only and must never be committed.
+
+## Private access
+
+The dashboard uses Supabase Auth. Sign up on the site, then grant that account access from your laptop:
+
+```bash
+export SUPABASE_SECRET_KEY="your-sb-secret-key"
+conda run -n role-radar python grant_access.py your-email@example.com
+```
+
+Only users added to `role_radar_admins` can read runs or jobs.
 
 ## Deploy
 

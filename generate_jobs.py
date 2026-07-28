@@ -168,13 +168,13 @@ def publish_to_supabase(
     jobs: list[dict[str, Any]], *, source_count: int, fetched_count: int
 ) -> None:
     """Publish one complete scan; only the latest run is visible to the dashboard."""
-    service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-    if not service_key:
+    secret_key = os.getenv("SUPABASE_SECRET_KEY")
+    if not secret_key:
         raise RuntimeError(
-            "SUPABASE_SERVICE_ROLE_KEY is required to publish jobs. "
+            "SUPABASE_SECRET_KEY is required to publish jobs. "
             "Add it to your local environment; never commit it or expose it to Vercel."
         )
-    client: Client = create_client(os.getenv("SUPABASE_URL", DEFAULT_SUPABASE_URL), service_key)
+    client: Client = create_client(os.getenv("SUPABASE_URL", DEFAULT_SUPABASE_URL), secret_key)
     run = (
         client.table("role_radar_runs")
         .insert(
