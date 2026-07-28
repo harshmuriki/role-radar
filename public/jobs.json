@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-28T10:38:17.425120+00:00",
+  "generatedAt": "2026-07-28T14:03:54.208817+00:00",
   "filters": {
     "title": [],
     "location": [],
@@ -10,7 +10,7 @@
     "employment_type": [],
     "remote": null
   },
-  "fetched": 167,
+  "fetched": 168,
   "jobs": [
     {
       "id": "workday:REQ_26_32520",
@@ -394,6 +394,22 @@
       "postedDaysAgo": 7,
       "url": "https://owensminor.wd1.myworkdayjobs.com/OMCareers/job/MA-SPRINGFIELD/Territory-Sales-Executive-Springfield--MA_REQ_26_32862",
       "requisitionId": "REQ_26_32862",
+      "description": null
+    },
+    {
+      "id": "workday:REQ_26_32900",
+      "title": "System Analyst 3",
+      "company": "Owens & Minor",
+      "ats": "workday",
+      "location": "3609 OM Halyard India",
+      "remote": null,
+      "employmentType": null,
+      "department": null,
+      "postedAt": null,
+      "postedText": "Posted Today",
+      "postedDaysAgo": 0,
+      "url": "https://owensminor.wd1.myworkdayjobs.com/OMCareers/job/3609-OM-Halyard-India/System-Analyst-3_REQ_26_32900-1",
+      "requisitionId": "REQ_26_32900",
       "description": null
     }
   ],
