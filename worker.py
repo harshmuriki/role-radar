@@ -7,8 +7,9 @@ import time
 from generate_jobs import ROOT, load_local_env, process_queued_scans, process_queued_tests
 
 
-def run_full_scan() -> None:
-    subprocess.run([sys.executable, str(ROOT / "generate_jobs.py")], check=True)
+def run_full_scan(user_id: str) -> None:
+    env = dict(os.environ, ROLE_RADAR_USER_ID=user_id)
+    subprocess.run([sys.executable, str(ROOT / "generate_jobs.py")], check=True, env=env)
 
 
 def main() -> None:

@@ -17,7 +17,7 @@ import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { CompanyManager } from "@/components/company-manager";
 import { scanStatusMessage, type ScanRequestResult } from "@/lib/scan-request";
-import { accessDeniedMessage } from "@/lib/access";
+import { accessDeniedMessage, signUpSuccessMessage } from "@/lib/access";
 
 type Job = {
   id: string;
@@ -144,7 +144,7 @@ export function Dashboard() {
       ? await supabase.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin } })
       : await supabase.auth.signInWithPassword({ email, password });
     if (result.error) setError(result.error.message);
-    else if (isSignUp) setError("Account created. Confirm your email, then sign in. Only approved emails can access Role Radar.");
+    else if (isSignUp) setError(signUpSuccessMessage(Boolean(result.data.session)));
     setAuthBusy(false);
   }
 

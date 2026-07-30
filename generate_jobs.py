@@ -163,10 +163,12 @@ def load_supabase_companies() -> list[dict[str, Any]]:
     if not secret_key:
         return []
     client: Client = create_client(os.getenv("SUPABASE_URL", DEFAULT_SUPABASE_URL), secret_key)
+    user_id = worker_user_id(client)
     response = (
         client.table("role_radar_companies")
         .select("name, careers_url, ats_type, ats_slug, posted_within_days, role_filters")
         .eq("active", True)
+        .eq("user_id", user_id)
         .order("created_at")
         .execute()
     )
@@ -184,6 +186,9 @@ def load_supabase_companies() -> list[dict[str, Any]]:
 
 
 def worker_user_id(client: Client) -> str:
+    explicit_user_id = os.getenv("ROLE_RADAR_USER_ID")
+    if explicit_user_id:
+        return explicit_user_id
     email = os.getenv("ROLE_RADAR_USER_EMAIL")
     if not email:
         raise RuntimeError("ROLE_RADAR_USER_EMAIL is required for a local worker.")
@@ -273,8 +278,14 @@ def publish_to_supabase(
         for job in jobs
     ]
     if rows:
-        client.table("role_radar_jobs").upsert(rows, on_conflict="id").execute()
-    client.table("role_radar_jobs").delete().neq("last_seen_run_id", run_id).execute()
+        client.table("role_radar_jobs").upsert(rows, on_conflict="user_id,id").execute()
+    (
+        client.table("role_radar_jobs")
+        .delete()
+        .eq("user_id", user_id)
+        .neq("last_seen_run_id", run_id)
+        .execute()
+    )
     print(f"Published scan {run_id} to Supabase.")
 
 
@@ -283,7 +294,13 @@ def process_queued_tests() -> None:
     if not secret_key:
         return
     client: Client = create_client(os.getenv("SUPABASE_URL", DEFAULT_SUPABASE_URL), secret_key)
-    tests = client.table("role_radar_company_tests").select("id, company_id, role_radar_companies(name, careers_url, ats_type, ats_slug)").eq("status", "queued").execute().data
+    tests = (
+        client.table("role_radar_company_tests")
+        .select("id, user_id, company_id, role_radar_companies(name, careers_url, ats_type, ats_slug)")
+        .eq("status", "queued")
+        .execute()
+        .data
+    )
     for test in tests:
         source = test["role_radar_companies"]
         try:
@@ -297,14 +314,14 @@ def process_queued_tests() -> None:
 
 
 def process_queued_scans(run_scan: Any) -> None:
-    """Execute full scans requested by any member of the shared workspace."""
+    """Run each queued scan in the requesting account's isolated workspace."""
     secret_key = os.getenv("SUPABASE_SECRET_KEY")
     if not secret_key:
         return
     client: Client = create_client(os.getenv("SUPABASE_URL", DEFAULT_SUPABASE_URL), secret_key)
     requests = (
         client.table("role_radar_scan_requests")
-        .select("id")
+        .select("id, user_id")
         .eq("status", "queued")
         .execute()
         .data
@@ -313,7 +330,7 @@ def process_queued_scans(run_scan: Any) -> None:
         request_id = request["id"]
         client.table("role_radar_scan_requests").update({"status": "running", "started_at": datetime.now(UTC).isoformat(), "error": None}).eq("id", request_id).execute()
         try:
-            run_scan()
+            run_scan(request["user_id"])
             client.table("role_radar_scan_requests").update({"status": "completed", "completed_at": datetime.now(UTC).isoformat()}).eq("id", request_id).execute()
             print(f"Completed dashboard-requested scan {request_id}")
         except Exception as exc:

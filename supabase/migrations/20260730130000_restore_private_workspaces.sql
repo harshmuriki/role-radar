@@ -1,0 +1,38 @@
+-- Restore account isolation after the shared-workspace experiment.
+-- Each allowed user may manage and read only rows that carry their user_id.
+
+-- Job IDs originate from ATS boards and are only globally unique per source, not
+-- per Role Radar account. Scope the key so two users can retain the same listing.
+alter table public.role_radar_jobs
+  drop constraint if exists role_radar_jobs_pkey;
+
+alter table public.role_radar_jobs
+  add primary key (user_id, id);
+
+drop policy if exists "Allowed users manage shared companies" on public.role_radar_companies;
+create policy "Allowed users manage own companies"
+  on public.role_radar_companies for all to authenticated
+  using ((select auth.uid()) = user_id and public.role_radar_access_allowed())
+  with check ((select auth.uid()) = user_id and public.role_radar_access_allowed());
+
+drop policy if exists "Allowed users read shared runs" on public.role_radar_runs;
+create policy "Allowed users read own runs"
+  on public.role_radar_runs for select to authenticated
+  using ((select auth.uid()) = user_id and public.role_radar_access_allowed());
+
+drop policy if exists "Allowed users read shared jobs" on public.role_radar_jobs;
+create policy "Allowed users read own jobs"
+  on public.role_radar_jobs for select to authenticated
+  using ((select auth.uid()) = user_id and public.role_radar_access_allowed());
+
+drop policy if exists "Allowed users manage shared tests" on public.role_radar_company_tests;
+create policy "Allowed users manage own tests"
+  on public.role_radar_company_tests for all to authenticated
+  using ((select auth.uid()) = user_id and public.role_radar_access_allowed())
+  with check ((select auth.uid()) = user_id and public.role_radar_access_allowed());
+
+drop policy if exists "Allowed users manage shared scan requests" on public.role_radar_scan_requests;
+create policy "Allowed users manage own scan requests"
+  on public.role_radar_scan_requests for all to authenticated
+  using ((select auth.uid()) = user_id and public.role_radar_access_allowed())
+  with check ((select auth.uid()) = user_id and public.role_radar_access_allowed());

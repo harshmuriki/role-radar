@@ -1,3 +1,4 @@
+import os
 import unittest
 from unittest.mock import patch
 
@@ -5,8 +6,9 @@ from generate_jobs import process_queued_scans
 
 
 class FakeQuery:
-    def __init__(self, data=None):
+    def __init__(self, data=None, updates=None):
         self.data = data or []
+        self.updates = updates
 
     def select(self, *_args):
         return self
@@ -15,7 +17,8 @@ class FakeQuery:
         return self
 
     def update(self, payload):
-        self.payload = payload
+        if self.updates is not None:
+            self.updates.append(payload)
         return self
 
     def execute(self):
@@ -24,34 +27,26 @@ class FakeQuery:
 
 class FakeClient:
     def __init__(self):
-        self.requests = FakeQuery([{"id": "request-1"}])
         self.updates = []
+        self.requests = FakeQuery([{"id": "request-1", "user_id": "user-1"}], self.updates)
 
     def table(self, name):
         if name == "role_radar_scan_requests":
-            query = self.requests
-            original_update = query.update
-
-            def update(payload):
-                self.updates.append(payload)
-                return original_update(payload)
-
-            query.update = update
-            return query
+            return self.requests
         raise AssertionError(f"Unexpected table: {name}")
 
 
 class ProcessQueuedScansTests(unittest.TestCase):
-    @patch("generate_jobs.worker_user_id", return_value="user-1")
+    @patch.dict(os.environ, {"SUPABASE_SECRET_KEY": "test-key"})
     @patch("generate_jobs.create_client")
-    def test_marks_a_queued_scan_completed_after_running_it(self, create_client, _worker_user_id):
+    def test_routes_each_queued_scan_to_the_requesting_owner(self, create_client):
         client = FakeClient()
         create_client.return_value = client
         calls = []
 
-        process_queued_scans(lambda: calls.append("scan"))
+        process_queued_scans(lambda user_id: calls.append(user_id))
 
-        self.assertEqual(calls, ["scan"])
+        self.assertEqual(calls, ["user-1"])
         self.assertEqual(client.updates[0]["status"], "running")
         self.assertEqual(client.updates[-1]["status"], "completed")
         self.assertIn("completed_at", client.updates[-1])
