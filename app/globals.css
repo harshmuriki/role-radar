@@ -69,6 +69,7 @@ h1, h2, h3, p { margin-top: 0; }
 .company-form details label + label { margin-top: 9px; }
 .company-form .primary-button { min-height: 38px; font-size: 12px; }
 .company-error { margin: 10px 0 0; color: var(--danger); font-size: 11px; line-height: 1.45; }
+.company-notice { margin: 10px 0 0; color: var(--teal-dark); font-size: 11px; line-height: 1.45; }
 .filter-intro { margin: 0 0 2px; color: var(--ink-muted); font-size: 11px; line-height: 1.45; }
 .results-panel { min-height: 510px; overflow: hidden; }
 .results-heading { display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 20px 22px; border-bottom: 1px solid var(--line); }

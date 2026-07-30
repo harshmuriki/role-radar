@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { ChevronDown, ChevronUp, Link2, LoaderCircle, Pencil, Plus, TestTube2, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { testResultMessage } from "@/lib/company-test";
 
 type Filters = { title?: string[]; exclude_any?: string[]; location?: string[]; remote?: boolean };
 type Company = { id: string; name: string; careers_url: string; ats_type: string | null; ats_slug: string | null; posted_within_days: number; role_filters: Filters };
@@ -15,6 +16,7 @@ export function CompanyManager() {
   const [editing, setEditing] = useState<Company | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [days, setDays] = useState("7");
@@ -52,11 +54,44 @@ export function CompanyManager() {
   }
 
   async function removeCompany(id: string) { setBusy(true); setError(""); const { error: deleteError } = await supabase.from("role_radar_companies").delete().eq("id", id); setBusy(false); if (deleteError) { setError(deleteError.message); return; } await loadCompanies(); }
-  async function queueTest(company: Company) { setBusy(true); setError(""); const { error: testError } = await supabase.from("role_radar_company_tests").insert({ company_id: company.id }); setBusy(false); setError(testError ? testError.message : `Test queued for ${company.name}. It will run with your next local scraper run.`); }
+  async function runTest(company: Company) {
+    setBusy(true);
+    setError("");
+    setNotice(`Testing ${company.name} now…`);
+    try {
+      const { data: startedTest, error: startError } = await supabase
+        .from("role_radar_company_tests")
+        .insert({ company_id: company.id })
+        .select("id")
+        .single();
+      if (startError || !startedTest) throw new Error(startError?.message || "Could not start the test.");
+
+      const deadline = Date.now() + 90_000;
+      while (Date.now() < deadline) {
+        await new Promise((resolve) => window.setTimeout(resolve, 1_000));
+        const { data: test, error: pollError } = await supabase
+          .from("role_radar_company_tests")
+          .select("status, fetched_count, error")
+          .eq("id", startedTest.id)
+          .single();
+        if (pollError) throw new Error(pollError.message);
+        if (test?.status === "passed" || test?.status === "failed") {
+          setNotice(test.status === "passed" ? testResultMessage(company.name, test) : "");
+          if (test.status === "failed") setError(testResultMessage(company.name, test));
+          return;
+        }
+      }
+      setError(`Test request for ${company.name} did not finish within 90 seconds. Confirm your local worker is running.`);
+    } catch (testError) {
+      setError(testError instanceof Error ? testError.message : "Could not run the test.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return <aside className="control-panel company-manager">
     <div className="panel-heading"><div><p className="eyebrow">Company sources</p><h2>{companies.length} tracked {companies.length === 1 ? "company" : "companies"}</h2></div><Link2 size={20} /></div>
-    <div className="company-list">{companies.map((company) => <div className="company-row" key={company.id}><div><strong>{company.name}</strong><span>{company.role_filters?.title?.length ? company.role_filters.title.join(", ") : "All roles"} · last {company.posted_within_days}d</span></div><div className="company-actions"><button className="edit-company" aria-label={`Test ${company.name}`} onClick={() => void queueTest(company)} disabled={busy}><TestTube2 size={14} /></button><button className="edit-company" aria-label={`Edit ${company.name}`} onClick={() => openEditor(company)} disabled={busy}><Pencil size={14} /></button><button className="delete-company" aria-label={`Remove ${company.name}`} onClick={() => void removeCompany(company.id)} disabled={busy}><Trash2 size={14} /></button></div></div>)}</div>
+    <div className="company-list">{companies.map((company) => <div className="company-row" key={company.id}><div><strong>{company.name}</strong><span>{company.role_filters?.title?.length ? company.role_filters.title.join(", ") : "All roles"} · last {company.posted_within_days}d</span></div><div className="company-actions"><button className="edit-company" aria-label={`Test ${company.name}`} onClick={() => void runTest(company)} disabled={busy}><TestTube2 size={14} /></button><button className="edit-company" aria-label={`Edit ${company.name}`} onClick={() => openEditor(company)} disabled={busy}><Pencil size={14} /></button><button className="delete-company" aria-label={`Remove ${company.name}`} onClick={() => void removeCompany(company.id)} disabled={busy}><Trash2 size={14} /></button></div></div>)}</div>
     <button className="add-company-toggle" onClick={() => { if (expanded) { setExpanded(false); resetForm(); } else openEditor(); }}><Plus size={15} />Add careers site{expanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}</button>
     {expanded && <form className="company-form" onSubmit={saveCompany}>
       <p className="filter-intro">Use role keywords to focus each company on exactly the jobs you want.</p>
@@ -72,6 +107,7 @@ export function CompanyManager() {
       <button className="primary-button" disabled={busy}>{busy ? <><LoaderCircle className="spin" size={15} />Saving…</> : editing ? "Save filters" : "Save company"}</button>
     </form>}
     {!expanded && error && <p className="company-error" role="alert">{error}</p>}
+    {!expanded && notice && <p className="company-notice" role="status">{notice}</p>}
     <div className="local-note"><Link2 size={16} /><p>Filters are applied the next time you run the local scraper.</p></div>
   </aside>;
 }
