@@ -16,6 +16,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { CompanyManager } from "@/components/company-manager";
+import { scanStatusMessage, type ScanRequestResult } from "@/lib/scan-request";
 
 type Job = {
   id: string;
@@ -51,6 +52,8 @@ export function Dashboard() {
   const [password, setPassword] = useState("");
   const [isSignUp, setIsSignUp] = useState(false);
   const [authBusy, setAuthBusy] = useState(false);
+  const [scanBusy, setScanBusy] = useState(false);
+  const [scanMessage, setScanMessage] = useState("");
 
   const loadPipeline = useCallback(async () => {
     setLoading(true);
@@ -134,6 +137,45 @@ export function Dashboard() {
     setAuthBusy(false);
   }
 
+  async function runScanNow() {
+    setScanBusy(true);
+    setError("");
+    setScanMessage("Sending scan request to your local worker…");
+    try {
+      const { data: request, error: requestError } = await supabase
+        .from("role_radar_scan_requests")
+        .insert({})
+        .select("id")
+        .single();
+      if (requestError || !request) throw new Error(requestError?.message || "Could not start the scan.");
+
+      const deadline = Date.now() + 15 * 60_000;
+      while (Date.now() < deadline) {
+        await new Promise((resolve) => window.setTimeout(resolve, 1_000));
+        const { data: current, error: pollError } = await supabase
+          .from("role_radar_scan_requests")
+          .select("status, error")
+          .eq("id", request.id)
+          .single();
+        if (pollError) throw new Error(pollError.message);
+        const scan = current as ScanRequestResult | null;
+        if (scan?.status === "completed") {
+          setScanMessage(scanStatusMessage(scan));
+          await loadPipeline();
+          return;
+        }
+        if (scan?.status === "failed") throw new Error(scanStatusMessage(scan));
+        setScanMessage(scan ? scanStatusMessage(scan) : "Running your scan now…");
+      }
+      throw new Error("The scan did not finish within 15 minutes. Confirm your local worker is running.");
+    } catch (scanError) {
+      setScanMessage("");
+      setError(scanError instanceof Error ? scanError.message : "Could not run the scan.");
+    } finally {
+      setScanBusy(false);
+    }
+  }
+
   if (!session) {
     return (
       <main className="auth-page">
@@ -176,7 +218,7 @@ export function Dashboard() {
             <h1 id="page-title">Find the roles worth<br />your attention.</h1>
             <p className="hero-copy">A clear, curated view of newly posted roles across your company list.</p>
           </div>
-          <div className="scan-status"><span className={run ? "status-dot" : "status-dot idle"} /><div><strong>{run ? "Pipeline is current" : "Awaiting a scan"}</strong><span>{run ? `Updated ${formatDate(run.generated_at)}` : "Run generate_jobs.py locally to publish roles"}</span></div></div>
+          <div className="scan-status"><span className={run ? "status-dot" : "status-dot idle"} /><div><strong>{scanBusy ? "Scan in progress" : run ? "Pipeline is current" : "Awaiting a scan"}</strong><span>{scanMessage || (run ? `Updated ${formatDate(run.generated_at)}` : "Run a scan to publish roles")}</span><button className="scan-button" onClick={() => void runScanNow()} disabled={scanBusy}>{scanBusy ? <><LoaderCircle className="spin" size={14} />Running…</> : <><RefreshCw size={14} />Run scan now</>}</button></div></div>
         </section>
 
         {error && <p className="feedback error" role="alert">{error}</p>}

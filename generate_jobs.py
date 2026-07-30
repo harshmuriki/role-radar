@@ -299,6 +299,33 @@ def process_queued_tests() -> None:
             print(f"Test failed for {source['name']}: {exc}")
 
 
+def process_queued_scans(run_scan: Any) -> None:
+    """Execute full scans requested by the dashboard for this worker's user."""
+    secret_key = os.getenv("SUPABASE_SECRET_KEY")
+    if not secret_key:
+        return
+    client: Client = create_client(os.getenv("SUPABASE_URL", DEFAULT_SUPABASE_URL), secret_key)
+    user_id = worker_user_id(client)
+    requests = (
+        client.table("role_radar_scan_requests")
+        .select("id")
+        .eq("status", "queued")
+        .eq("user_id", user_id)
+        .execute()
+        .data
+    )
+    for request in requests:
+        request_id = request["id"]
+        client.table("role_radar_scan_requests").update({"status": "running", "started_at": datetime.now(UTC).isoformat(), "error": None}).eq("id", request_id).execute()
+        try:
+            run_scan()
+            client.table("role_radar_scan_requests").update({"status": "completed", "completed_at": datetime.now(UTC).isoformat()}).eq("id", request_id).execute()
+            print(f"Completed dashboard-requested scan {request_id}")
+        except Exception as exc:
+            client.table("role_radar_scan_requests").update({"status": "failed", "error": str(exc), "completed_at": datetime.now(UTC).isoformat()}).eq("id", request_id).execute()
+            print(f"Dashboard-requested scan {request_id} failed: {exc}")
+
+
 def main() -> None:
     load_local_env()
     parser = argparse.ArgumentParser(description="Generate and publish Role Radar jobs with ats-scrapers.")

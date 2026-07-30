@@ -24,6 +24,8 @@ h1, h2, h3, p { margin-top: 0; }
 .scan-status strong, .scan-status span:not(.status-dot) { display: block; }
 .scan-status strong { font-size: 13px; }
 .scan-status span:not(.status-dot) { margin-top: 2px; color: var(--ink-muted); font-size: 12px; }
+.scan-button { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; padding: 7px 9px; border: 0; border-radius: 7px; color: #fff; background: var(--teal); font-size: 11px; font-weight: 700; }
+.scan-button:hover { background: var(--teal-dark); }
 .status-dot { flex: none; width: 9px; height: 9px; margin-top: 5px; border-radius: 50%; background: #36aa75; box-shadow: 0 0 0 4px #dcf5e8; }
 .status-dot.idle { background: #9eabb2; box-shadow: 0 0 0 4px #e5eaeb; }
 .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }

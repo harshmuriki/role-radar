@@ -32,7 +32,7 @@ Never commit `.env`. The secret key stays only on this computer.
 docker compose -p role-radar up -d --build
 ```
 
-The worker polls Supabase every three seconds. Clicking the test-tube button next to a company in the Vercel dashboard queues a test; this local worker performs the actual ATS scrape and writes the result back.
+The worker polls Supabase every three seconds. Clicking **Run scan now** in the Vercel dashboard triggers an immediate full scrape and publish for this account. The test-tube button next to a company similarly runs an immediate source test. This worker performs both operations and writes the results back.
 
 ## 4. Check or stop it
 
