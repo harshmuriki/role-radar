@@ -53,3 +53,5 @@ Import the repository into Vercel as a static Next.js project. The public Supaba
 ## Conda environment
 
 The local environment is named `role-radar`. Recreate it on another machine with `conda env create -f environment.yml`.
+
+For the always-on Docker worker setup on another account or computer, see [LOCAL_WORKER_SETUP.md](LOCAL_WORKER_SETUP.md).
