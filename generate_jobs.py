@@ -163,12 +163,10 @@ def load_supabase_companies() -> list[dict[str, Any]]:
     if not secret_key:
         return []
     client: Client = create_client(os.getenv("SUPABASE_URL", DEFAULT_SUPABASE_URL), secret_key)
-    user_id = worker_user_id(client)
     response = (
         client.table("role_radar_companies")
         .select("name, careers_url, ats_type, ats_slug, posted_within_days, role_filters")
         .eq("active", True)
-        .eq("user_id", user_id)
         .order("created_at")
         .execute()
     )
@@ -285,8 +283,7 @@ def process_queued_tests() -> None:
     if not secret_key:
         return
     client: Client = create_client(os.getenv("SUPABASE_URL", DEFAULT_SUPABASE_URL), secret_key)
-    user_id = worker_user_id(client)
-    tests = client.table("role_radar_company_tests").select("id, company_id, role_radar_companies(name, careers_url, ats_type, ats_slug)").eq("status", "queued").eq("user_id", user_id).execute().data
+    tests = client.table("role_radar_company_tests").select("id, company_id, role_radar_companies(name, careers_url, ats_type, ats_slug)").eq("status", "queued").execute().data
     for test in tests:
         source = test["role_radar_companies"]
         try:
@@ -300,17 +297,15 @@ def process_queued_tests() -> None:
 
 
 def process_queued_scans(run_scan: Any) -> None:
-    """Execute full scans requested by the dashboard for this worker's user."""
+    """Execute full scans requested by any member of the shared workspace."""
     secret_key = os.getenv("SUPABASE_SECRET_KEY")
     if not secret_key:
         return
     client: Client = create_client(os.getenv("SUPABASE_URL", DEFAULT_SUPABASE_URL), secret_key)
-    user_id = worker_user_id(client)
     requests = (
         client.table("role_radar_scan_requests")
         .select("id")
         .eq("status", "queued")
-        .eq("user_id", user_id)
         .execute()
         .data
     )

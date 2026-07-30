@@ -52,6 +52,7 @@ export function Dashboard() {
   const [error, setError] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isSignUp, setIsSignUp] = useState(false);
   const [authBusy, setAuthBusy] = useState(false);
   const [scanBusy, setScanBusy] = useState(false);
   const [scanMessage, setScanMessage] = useState("");
@@ -139,8 +140,11 @@ export function Dashboard() {
     event.preventDefault();
     setAuthBusy(true);
     setError("");
-    const result = await supabase.auth.signInWithPassword({ email, password });
+    const result = isSignUp
+      ? await supabase.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin } })
+      : await supabase.auth.signInWithPassword({ email, password });
     if (result.error) setError(result.error.message);
+    else if (isSignUp) setError("Account created. Confirm your email, then sign in. Only approved emails can access Role Radar.");
     setAuthBusy(false);
   }
 
@@ -192,15 +196,18 @@ export function Dashboard() {
           <div className="brand auth-brand"><span className="brand-mark"><Radar size={19} /></span><span>Role Radar</span></div>
           <div className="auth-copy">
             <p className="eyebrow">Private job intelligence</p>
-            <h1 id="auth-title">Welcome back</h1>
+            <h1 id="auth-title">{isSignUp ? "Create your account" : "Welcome back"}</h1>
             <p>Role Radar is available to approved accounts only.</p>
           </div>
           <form className="auth-form" onSubmit={authenticate}>
             <label>Email address<input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" placeholder="you@example.com" /></label>
-            <label>Password<input required type="password" minLength={6} value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" placeholder="Your password" /></label>
+            <label>Password<input required type="password" minLength={6} value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={isSignUp ? "new-password" : "current-password"} placeholder="At least 6 characters" /></label>
             {error && <p className="auth-error" role="alert">{error}</p>}
-            <button className="primary-button" disabled={authBusy}>{authBusy ? <><LoaderCircle className="spin" size={16} />Working…</> : "Sign in"}</button>
+            <button className="primary-button" disabled={authBusy}>{authBusy ? <><LoaderCircle className="spin" size={16} />Working…</> : isSignUp ? "Create account" : "Sign in"}</button>
           </form>
+          <button className="text-button" onClick={() => { setIsSignUp(!isSignUp); setError(""); }}>
+            {isSignUp ? "Already have an account? Sign in" : "New here? Create your approved account"}
+          </button>
         </section>
       </main>
     );
