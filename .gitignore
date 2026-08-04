@@ -15,3 +15,10 @@ output/*.csv
 # Python cache
 __pycache__/
 *.py[cod]
+
+# Role Radar local email delivery state
+.role-radar-email-state.json
+.role-radar-state/
+
+# Graphify machine-local cache
+graphify-out/cache/
