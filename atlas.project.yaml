@@ -1,0 +1,16 @@
+id: role-radar-hasvi
+name: Role Radar — Hasvi worker
+description: Hasvi account-scoped analyst and undergraduate Summer 2027 job discovery worker.
+owner: Hasvi
+local_path: /home/harshmuriki/Documents/role-radar
+health:
+  container_path: /health
+  container_port: 8080
+  timeout_seconds: 5
+ops:
+  type: compose_service
+  compose_file: /home/harshmuriki/Documents/role-radar/docker-compose.yml
+  compose_service: role-radar-worker
+  container: role-radar-hasvi-role-radar-worker-1
+  reset_allowed: true
+tags: [career, automation, worker, analyst, summer-2027]
