@@ -370,8 +370,9 @@ def main() -> None:
         return
 
     companies_config = json.loads(args.companies.read_text(encoding="utf-8"))
-    companies = load_supabase_companies() or load_companies(args.companies)
-    filters = json.loads(args.filters.read_text(encoding="utf-8"))
+    companies = load_supabase_companies() if os.getenv("SUPABASE_SECRET_KEY") else load_companies(args.companies)
+    filters_path = Path(os.getenv("ROLE_RADAR_FILTERS_FILE", str(args.filters)))
+    filters = json.loads(filters_path.read_text(encoding="utf-8"))
     if filters.get("posted_within_days") is None and isinstance(companies_config, dict):
         filters["posted_within_days"] = companies_config.get("posted_within_days", 7)
     needs_description = bool(as_list(filters.get("description")) or as_list(filters.get("description_all")))
